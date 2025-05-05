@@ -25,7 +25,7 @@ type HealthOutput struct {
 type Link struct {
 	Id      int    `json:"id" doc:"Id of the resource"`
 	Url     string `json:"url,omitempty" doc:"Url to search"`
-	Total	int	   `json:"total" doc:"Number of the links finds"`
+	Links	int	   `json:"links" doc:"Number of the links finds"`
 	Time    string `json:"time" doc:"Time take to search"`
 }
 
@@ -75,7 +75,7 @@ func main() {
 		OperationID: "get-links",
 		Method:      http.MethodGet,
 		Path:        "/v1/links",
-		Summary:     "Get links to 'https' and 'http' from 10 sites.",
+		Summary:     "Get links.",
 		Description: "Get links to 'https' and 'http' from 10 sites.",
 		Tags:        []string{"Links"},
 	}, func(ctx context.Context, input *struct{}) (*LinksOutput, error) {
@@ -83,12 +83,18 @@ func main() {
 
 		start := time.Now()
 
+		c := colly.NewCollector(
+			colly.MaxDepth(10),
+			colly.Async(true),
+		)
+		
+
 		for index, url := range urls {
 			count := 0
 			tag := "href"
 	
-			c := colly.NewCollector()
-	
+			c.Limit(&colly.LimitRule{DomainGlob: "*", Parallelism: 10})
+			
 			c.OnHTML("a[href]", func(e *colly.HTMLElement) {
 				link := e.Attr(tag)
 				if link == "" {
@@ -108,7 +114,7 @@ func main() {
 			links = append(links, Link{
 				Id:      index,
 				Url:     url,
-				Total:	 count,
+				Links:	 count,
 				Time:    timeElapsed.String(),
 			})
 			resp.Body.Links = links
