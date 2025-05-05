@@ -121,7 +121,7 @@ func main() {
 				Time:    timeElapsed.String(),
 			})
 			resp.Body.Links = links
-			fmt.Printf("id: %d | url: %s |  links: %d | time: %s\n", index, url, count, timeElapsed.String())
+			fmt.Printf("id: %d | url: %s | links: %d | time: %s\n", index, url, count, timeElapsed.String())
 		}
 
 		fmt.Println("Finished searching links.")
