@@ -83,20 +83,23 @@ func main() {
 
 		start := time.Now()
 
+		fmt.Println("Starting to search links...")
+
+		// Create a new collector
 		c := colly.NewCollector(
 			colly.MaxDepth(10),
 			colly.Async(true),
 		)
 		
+		
+		c.Limit(&colly.LimitRule{DomainGlob: "*", Parallelism: 10})
 
+		// Set a callback for when a visited HTML element is found
 		for index, url := range urls {
 			count := 0
-			tag := "href"
-	
-			c.Limit(&colly.LimitRule{DomainGlob: "*", Parallelism: 10})
 			
 			c.OnHTML("a[href]", func(e *colly.HTMLElement) {
-				link := e.Attr(tag)
+				link := e.Attr("href")
 				if link == "" {
 					return
 				} else {
@@ -118,8 +121,10 @@ func main() {
 				Time:    timeElapsed.String(),
 			})
 			resp.Body.Links = links
-			fmt.Printf("url: %s | tags: %d\n", url, count)
+			fmt.Printf("id: %d | url: %s |  links: %d | time: %s\n", index, url, count, timeElapsed.String())
 		}
+
+		fmt.Println("Finished searching links.")
 
 		return resp, nil
 	})
