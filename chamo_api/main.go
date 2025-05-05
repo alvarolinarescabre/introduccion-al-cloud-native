@@ -8,11 +8,17 @@ import (
 	"github.com/gocolly/colly"
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/danielgtaylor/huma/v2/adapters/humachi"
+	"github.com/danielgtaylor/huma/v2/humacli"
 	"github.com/go-chi/chi/v5"
 	"net/http"
 
 	_ "github.com/danielgtaylor/huma/v2/formats/cbor"
 )
+
+// Options for the CLI.
+type Options struct {
+	Port int `help:"Port to listen on" short:"p" default:"8888"`
+}
 
 // Health represents the response of the "get health" operation.
 type HealthOutput struct {
@@ -36,7 +42,8 @@ type LinksOutput struct {
 	}
 }
 
-func main() {
+func addRoutes(api huma.API) {
+
 	// 10 Websites and search https and http
 	urls := []string{
 		"https://www.holachamo.com",
@@ -50,10 +57,6 @@ func main() {
 		"https://www.github.com",
 		"https://www.google.com",
 	}
-
-	// Create a new router & API
-	router := chi.NewMux()
-	api := humachi.New(router, huma.DefaultConfig("Get links to 'https' and 'http' from 10 sites.", "1.0.0"))
 
 	// Add GET / for health checks
 	huma.Register(api, huma.Operation{
@@ -70,7 +73,8 @@ func main() {
 
 	links := make([]Link, 0)
 
-	// Register GET /v1/tags
+	// Register GET /v1/links
+	// This endpoint will search for links in the 10 websites
 	huma.Register(api, huma.Operation{
 		OperationID: "get-links",
 		Method:      http.MethodGet,
@@ -129,6 +133,94 @@ func main() {
 		return resp, nil
 	})
 
+
+	// Register GET /v1/link/{id}
+	// This endpoint will search for link in only one of 10 websites
+	huma.Register(api, huma.Operation{
+		OperationID: "get-link",
+		Method:      http.MethodGet,
+		Path:        "/v1/link/{id}",
+		Summary:     "Get link.",
+		Description: "Get link to 'https' and 'http' search for one of 10 websites",
+		Tags:        []string{"Links"},
+	}, func(ctx context.Context, input *struct{
+		Id int `path:"id" maxLength:"2" example:"0" doc:"Id of website from array"`
+	}) (*LinksOutput, error) {
+		resp := &LinksOutput{}
+
+		start := time.Now()
+
+		fmt.Println("Starting to search link...")
+
+		count := 0
+		index := 0
+
+		id := input.Id
+		// Check if the id is between 0 and 9
+		if id < 0 || id > 9 {
+			return nil, fmt.Errorf("id must be between 0 and 9")
+		}
+		// Get the url from the urls array
+		url := urls[id]
+
+		// Create a new collector
+		c := colly.NewCollector(
+			colly.MaxDepth(1),
+			colly.Async(true),
+		)
+		
+		c.Limit(&colly.LimitRule{DomainGlob: "*", Parallelism: 1})
+
+		// Set a callback for when a visited HTML element is found
+		c.OnHTML("a[href]", func(e *colly.HTMLElement) {
+			link := e.Attr("href")
+			if link == "" {
+				return
+			} else {
+				count += strings.Count(link, "https://")
+				count += strings.Count(link, "http://")
+			}
+		})
+	
+		c.Visit(url)
+		c.Wait()
+		
+		timeElapsed := time.Since(start)
+
+		links = append(links, Link{
+			Id:      index,
+			Url:     urls[id],
+			Links:	 count,
+			Time:    timeElapsed.String(),
+		})
+
+		
+		resp.Body.Links = links
+		fmt.Printf("id: %d | url: %s | link: %d | time: %s\n", index, urls[id], count, timeElapsed.String())
+
+		fmt.Println("Finished searching link.")
+
+		return resp, nil
+	})
+}
+
+func main() {
+	// Define the options for the CLI
+	cli := humacli.New(func(hooks humacli.Hooks, options *Options) {
+		// Create a new router & API
+		router := chi.NewMux()
+		api := humachi.New(router, huma.DefaultConfig("Get links to 'https' and 'http' from 10 sites.", "1.0.0"))
+
+		addRoutes(api)
+
+		// Tell the CLI how to start your server.
+		hooks.OnStart(func() {
+			fmt.Printf("Starting server on port %d...\n", options.Port)
+			http.ListenAndServe(fmt.Sprintf(":%d", options.Port), router)
+		})
+	})
+
+
 	// Start the server!
-	http.ListenAndServe("0.0.0.0:8888", router)
+	cli.Run()
 }
