@@ -121,9 +121,8 @@ func getLink(api huma.API) {
 
 		fmt.Println("Starting to search link...")
 
-		index := 0
-
 		id := input.Id
+
 		// Check if the id is between 0 and 9
 		if id < 0 || id > 9 {
 			return nil, fmt.Errorf("id must be between 0 and 9")
@@ -136,16 +135,18 @@ func getLink(api huma.API) {
 		timeElapsed := time.Since(start)
 
 		link = append(link, Link{
-			Id:    index,
+			Id:    id,
 			Url:   urls[id],
 			Links: count,
 			Time:  timeElapsed.String(),
 		})
 
 		resp.Body.Links = link
-		fmt.Printf("id: %d | url: %s | link: %d | time: %s\n", index, urls[id], count, timeElapsed.String())
+		fmt.Printf("id: %d | url: %s | link: %d | time: %s\n", id, urls[id], count, timeElapsed.String())
 
 		fmt.Println("Finished searching link.")
+
+		link = []Link{}
 
 		return resp, nil
 	})
@@ -153,7 +154,7 @@ func getLink(api huma.API) {
 
 func getLinks(api huma.API) {
 
-	links := make([]Link, 0)
+	links := []Link{}
 
 	// Register GET /v1/links
 	// This endpoint will search for links in the 10 websites
@@ -194,6 +195,8 @@ func getLinks(api huma.API) {
 
 		fmt.Println("Finished searching links.")
 
+		links = []Link{}
+
 		return resp, nil
 	})
 }
@@ -217,6 +220,5 @@ func main() {
 		})
 	})
 
-	// Start the server!
 	cli.Run()
 }
