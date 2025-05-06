@@ -34,13 +34,13 @@ type Link struct {
 	Id    int    `json:"id" doc:"Id of the resource"`
 	Url   string `json:"url,omitempty" doc:"Url to search"`
 	Links int    `json:"links" doc:"Number of the links finds"`
-	Time  string `json:"time" doc:"Time take to search"`
 }
 
 // Links response
 type LinksOutput struct {
 	Body struct {
 		Links []Link `json:"links" doc:"Links to search"`
+		Time  string `json:"time" doc:"Time take to search"`
 	}
 }
 
@@ -83,8 +83,11 @@ func webScrapingCounter(url string) int {
 	return count
 }
 
+// Add GET / for health checks
+// This endpoint will return a 200 OK response with a JSON body
+// containing the status of the service.
+// This is useful for health checks and monitoring.
 func getHealthCheck(api huma.API) {
-	// Add GET / for health checks
 	huma.Register(api, huma.Operation{
 		OperationID:   "get-health",
 		Summary:       "Get health",
@@ -138,13 +141,14 @@ func getLink(api huma.API) {
 			Id:    id,
 			Url:   urls[id],
 			Links: count,
-			Time:  timeElapsed.String(),
 		})
 
-		resp.Body.Links = link
-		fmt.Printf("id: %d | url: %s | link: %d | time: %s\n", id, urls[id], count, timeElapsed.String())
+		resp.Body.Time = timeElapsed.String()
 
-		fmt.Println("Finished searching link.")
+		resp.Body.Links = link
+		fmt.Printf("id: %d | url: %s | link: %d\n", id, urls[id], count)
+
+		fmt.Printf("Finished searching link. Take %s\n", timeElapsed.String())
 
 		link = []Link{}
 
@@ -187,13 +191,16 @@ func getLinks(api huma.API) {
 				Id:    index,
 				Url:   url,
 				Links: count,
-				Time:  timeElapsed.String(),
 			})
 			resp.Body.Links = links
-			fmt.Printf("id: %d | url: %s | links: %d | time: %s\n", index, url, count, timeElapsed.String())
+			resp.Body.Time = timeElapsed.String()
+
+			fmt.Printf("id: %d | url: %s | links: %d\n", index, url, count)
 		}
 
-		fmt.Println("Finished searching links.")
+		timeElapsed := time.Since(start)
+
+		fmt.Printf("Finished searching links. Take %s\n", timeElapsed.String())
 
 		links = []Link{}
 
