@@ -10,7 +10,7 @@ import (
 func TestGetHealthCheck(t *testing.T) {
 	_, api := humatest.New(t)
 
-	addRoutes(api)
+	getHealthCheck(api)
 
 	resp := api.Get("/")
 	if !strings.Contains(resp.Body.String(), "ok") {
@@ -21,13 +21,13 @@ func TestGetHealthCheck(t *testing.T) {
 func TestGetLink(t *testing.T) {
 	_, api := humatest.New(t)
 
-	addRoutes(api)
+	getLink(api)
 
 	resp := api.Get("/v1/link/0", map[string]any{
-			"id": 0,
-			"url": "https://www.holachamo.com",
-			"links": 18,
-        })
+		"id":    0,
+		"url":   "https://www.holachamo.com",
+		"links": 18,
+	})
 
 	if resp.Code != 200 {
 		t.Fatalf("Unexpected status code: %d", resp.Code)
@@ -37,7 +37,7 @@ func TestGetLink(t *testing.T) {
 func TestGetLinkError(t *testing.T) {
 	_, api := humatest.New(t)
 
-	addRoutes(api)
+	getLink(api)
 
 	resp := api.Get("/v1/link/10", map[string]any{
 		"message": "id must be between 0 and 9",
