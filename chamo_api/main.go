@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"strings"
+	"regexp"
 	"sync"
 	"time"
 
@@ -59,7 +59,6 @@ var urls = []string{
 }
 
 func webScrapingCounter(url string) int {
-
 	count := 0
 
 	// Create a new collector
@@ -70,11 +69,12 @@ func webScrapingCounter(url string) int {
 	// Set a callback for when a visited HTML element is found
 	c.OnHTML("a[href]", func(e *colly.HTMLElement) {
 		link := e.Attr("href")
-		if link == "" {
-			return
-		} else {
-			count += strings.Count(link, "https://")
-			count += strings.Count(link, "http://")
+		pattern := "https?://"
+		re := regexp.MustCompile(pattern)
+		matches := re.FindAllString(link, -1)
+
+		if matches != nil {
+			count += len(matches)
 		}
 	})
 
@@ -112,7 +112,7 @@ func getLink(api huma.API) {
 		OperationID: "get-link",
 		Method:      http.MethodGet,
 		Path:        "/v1/link/{id}",
-		Summary:     "Get link.",
+		Summary:     "Get link",
 		Description: "Get link to 'https' and 'http' search for one of 10 websites",
 		Tags:        []string{"Links"},
 	}, func(ctx context.Context, input *struct {
@@ -166,7 +166,7 @@ func getLinks(api huma.API) {
 		OperationID: "get-links",
 		Method:      http.MethodGet,
 		Path:        "/v1/links",
-		Summary:     "Get links.",
+		Summary:     "Get links",
 		Description: "Get links to 'https' and 'http' from 10 sites.",
 		Tags:        []string{"Links"},
 	}, func(ctx context.Context, input *struct{}) (*LinksOutput, error) {
