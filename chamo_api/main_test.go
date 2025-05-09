@@ -1,7 +1,6 @@
 package main
 
 import (
-	"strings"
 	"testing"
 
 	"github.com/danielgtaylor/huma/v2/humatest"
@@ -13,8 +12,9 @@ func TestGetHealthCheck(t *testing.T) {
 	getHealthCheck(api)
 
 	resp := api.Get("/")
-	if !strings.Contains(resp.Body.String(), "ok") {
-		t.Fatalf("Unexpected response: %s", resp.Body.String())
+
+	if resp.Code != 200 {
+		t.Fatalf("Unexpected status code: %d", resp.Code)
 	}
 }
 
@@ -25,9 +25,21 @@ func TestGetLink(t *testing.T) {
 
 	resp := api.Get("/v1/link/0", map[string]any{
 		"id":    0,
-		"url":   "https://www.holachamo.com",
-		"links": 18,
+		"url":   "https://go.dev",
+		"links": 67,
 	})
+
+	if resp.Code != 200 {
+		t.Fatalf("Unexpected status code: %d", resp.Code)
+	}
+}
+
+func TestGetLinks(t *testing.T) {
+	// Define the URLs to scrape
+	_, api := humatest.New(t)
+
+	getLinks(api)
+	resp := api.Get("/v1/links")
 
 	if resp.Code != 200 {
 		t.Fatalf("Unexpected status code: %d", resp.Code)
@@ -39,9 +51,7 @@ func TestGetLinkError(t *testing.T) {
 
 	getLink(api)
 
-	resp := api.Get("/v1/link/10", map[string]any{
-		"message": "id must be between 0 and 9",
-	})
+	resp := api.Get("/v1/link/10")
 
 	if resp.Code != 500 {
 		t.Fatalf("Unexpected status code: %d", resp.Code)

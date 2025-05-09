@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"regexp"
 	"sync"
 	"time"
@@ -58,17 +59,40 @@ var urls = []string{
 	"https://www.google.com",
 }
 
-func webScrapingCounter(url string) int {
+func getURL(url string) io.ReadCloser {
+	// Create a new request
+	req, err := http.NewRequest(http.MethodGet, url, nil)
+	if err != nil {
+		fmt.Printf("client: could not create request: %s\n", err)
+		os.Exit(1)
+	}
+
+	// Set the headers
+	req.Header.Set("Connection", "Keep-Alive")
+	req.Header.Set("Accept-Language", "es-ES")
+	req.Header.Set("User-Agent", "Mozilla/5.0")
+
+	// Create a new HTTP client
+	client := &http.Client{}
+	// Set a timeout for the request
+	client.Timeout = 10 * time.Second
+	// Send the request
+	res, err := http.DefaultClient.Do(req)
+
+	if err != nil {
+		fmt.Printf("client: error making http request: %s\n", err)
+		os.Exit(1)
+	}
+
+	return res.Body
+}
+
+func webScrapingCounter(data string) int {
 	count := 0
-
-	// Create a new collector
-	resp, _ := http.Get(url)
-
 	pattern := "href=\"(http|https)://"
 	re, _ := regexp.Compile(pattern)
-	defer resp.Body.Close()
-	body, _ := io.ReadAll(resp.Body)
-	matches := re.FindAllString(string(body), -1)
+
+	matches := re.FindAllString(string(data), -1)
 
 	if matches != nil {
 		count += len(matches)
@@ -127,7 +151,18 @@ func getLink(api huma.API) {
 		// Get the url from the urls array
 		url := urls[id]
 
-		count := webScrapingCounter(url)
+		// Get the response body
+		body := getURL(url)
+		defer body.Close()
+
+		// Read the response body
+		data, err := io.ReadAll(body)
+		if err != nil {
+			fmt.Printf("client: error reading response body: %s\n", err)
+			os.Exit(1)
+		}
+
+		count := webScrapingCounter(string(data))
 
 		timeElapsed := time.Since(start)
 
@@ -171,31 +206,42 @@ func getLinks(api huma.API) {
 		fmt.Println("Starting to search links...")
 
 		// Set a callback for when a visited HTML element is found
+		var wg = &sync.WaitGroup{}
+
 		for index, url := range urls {
 
-			wg := sync.WaitGroup{}
 			wg.Add(1)
-			count := webScrapingCounter(url)
-			wg.Done()
-			wg.Wait()
+			func(url string) {
+				defer wg.Done()
 
-			timeElapsed := time.Since(start)
+				// Get the response body
+				body := getURL(url)
+				defer body.Close()
 
-			links = append(links, Link{
-				Id:    index,
-				Url:   url,
-				Links: count,
-			})
-			resp.Body.Links = links
-			resp.Body.Time = timeElapsed.String()
+				// Read the response body
+				data, err := io.ReadAll(body)
+				if err != nil {
+					fmt.Printf("client: error reading response body: %s\n", err)
+					os.Exit(1)
+				}
 
-			fmt.Printf("id: %d | url: %s | links: %d\n", index, url, count)
+				count := webScrapingCounter(string(data))
+
+				links = append(links, Link{
+					Id:    index,
+					Url:   url,
+					Links: count,
+				})
+				fmt.Printf("id: %d | url: %s | links: %d\n", index, url, count)
+				resp.Body.Links = links
+			}(url)
 		}
+		wg.Wait()
 
 		timeElapsed := time.Since(start)
+		resp.Body.Time = timeElapsed.String()
 
-		fmt.Printf("Finished searching links. Take %s\n", timeElapsed.String())
-
+		fmt.Printf("Finished searching links. Took %s\n", timeElapsed.String())
 		links = []Link{}
 
 		return resp, nil
@@ -209,10 +255,27 @@ func main() {
 		router := chi.NewMux()
 		api := humachi.New(router, huma.DefaultConfig("Get links to 'https' and 'http' from 10 sites.", "1.0.0"))
 
+		wg := sync.WaitGroup{}
+		wg.Add(3)
 		// Call functions
-		getHealthCheck(api)
-		getLink(api)
-		go getLinks(api)
+		go func() {
+			defer wg.Done()
+			getHealthCheck(api)
+		}()
+
+		go func() {
+			defer wg.Done()
+			go getLink(api)
+
+		}()
+
+		go func() {
+			defer wg.Done()
+			go getLinks(api)
+
+		}()
+
+		wg.Wait()
 
 		// Tell the CLI how to start your server.
 		hooks.OnStart(func() {
