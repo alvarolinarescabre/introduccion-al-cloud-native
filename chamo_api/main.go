@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"io"
 	"net/http"
 	"regexp"
 	"sync"
@@ -12,7 +13,6 @@ import (
 	"github.com/danielgtaylor/huma/v2/adapters/humachi"
 	"github.com/danielgtaylor/huma/v2/humacli"
 	"github.com/go-chi/chi/v5"
-	"github.com/gocolly/colly"
 
 	_ "github.com/danielgtaylor/huma/v2/formats/cbor"
 )
@@ -46,7 +46,7 @@ type LinksOutput struct {
 
 // 10 Websites and search https and http
 var urls = []string{
-	"https://www.holachamo.com",
+	"https://go.dev",
 	"https://www.paradigmadigital.com",
 	"https://www.realpython.com",
 	"https://www.lapatilla.com",
@@ -62,23 +62,17 @@ func webScrapingCounter(url string) int {
 	count := 0
 
 	// Create a new collector
-	c := colly.NewCollector(
-		colly.MaxDepth(1),
-	)
+	resp, _ := http.Get(url)
 
-	// Set a callback for when a visited HTML element is found
-	c.OnHTML("a[href]", func(e *colly.HTMLElement) {
-		link := e.Attr("href")
-		pattern := "https?://"
-		re := regexp.MustCompile(pattern)
-		matches := re.FindAllString(link, -1)
+	pattern := "href=\"(http|https)://"
+	re, _ := regexp.Compile(pattern)
+	defer resp.Body.Close()
+	body, _ := io.ReadAll(resp.Body)
+	matches := re.FindAllString(string(body), -1)
 
-		if matches != nil {
-			count += len(matches)
-		}
-	})
-
-	c.Visit(url)
+	if matches != nil {
+		count += len(matches)
+	}
 
 	return count
 }
