@@ -120,6 +120,69 @@ func getHealthCheck(api huma.API) {
 
 }
 
+func getLinks(api huma.API) {
+
+	links := []Link{}
+
+	// Register GET /v1/links
+	// This endpoint will search for links in the 10 websites
+	huma.Register(api, huma.Operation{
+		OperationID: "get-links",
+		Method:      http.MethodGet,
+		Path:        "/v1/links",
+		Summary:     "Get links",
+		Description: "Get links to 'https' and 'http' from 10 sites.",
+		Tags:        []string{"Links"},
+	}, func(ctx context.Context, input *struct{}) (*LinksOutput, error) {
+		resp := &LinksOutput{}
+
+		start := time.Now()
+
+		fmt.Println("Starting to search links...")
+
+		// Set a callback for when a visited HTML element is found
+		var wg = &sync.WaitGroup{}
+
+		for index, url := range urls {
+
+			wg.Add(1)
+			func(url string) {
+				defer wg.Done()
+
+				// Get the response body
+				body := getURL(url)
+				defer body.Close()
+
+				// Read the response body
+				data, err := io.ReadAll(body)
+				if err != nil {
+					fmt.Printf("client: error reading response body: %s\n", err)
+					os.Exit(1)
+				}
+
+				count := webScrapingCounter(string(data))
+
+				links = append(links, Link{
+					Id:    index,
+					Url:   url,
+					Links: count,
+				})
+				fmt.Printf("id: %d | url: %s | links: %d\n", index, url, count)
+				resp.Body.Links = links
+			}(url)
+		}
+		wg.Wait()
+
+		timeElapsed := time.Since(start)
+		resp.Body.Time = timeElapsed.String()
+
+		fmt.Printf("Finished searching links. Took %s\n", timeElapsed.String())
+		links = []Link{}
+
+		return resp, nil
+	})
+}
+
 func getLink(api huma.API) {
 
 	link := make([]Link, 0)
@@ -180,69 +243,6 @@ func getLink(api huma.API) {
 		fmt.Printf("Finished searching link. Take %s\n", timeElapsed.String())
 
 		link = []Link{}
-
-		return resp, nil
-	})
-}
-
-func getLinks(api huma.API) {
-
-	links := []Link{}
-
-	// Register GET /v1/links
-	// This endpoint will search for links in the 10 websites
-	huma.Register(api, huma.Operation{
-		OperationID: "get-links",
-		Method:      http.MethodGet,
-		Path:        "/v1/links",
-		Summary:     "Get links",
-		Description: "Get links to 'https' and 'http' from 10 sites.",
-		Tags:        []string{"Links"},
-	}, func(ctx context.Context, input *struct{}) (*LinksOutput, error) {
-		resp := &LinksOutput{}
-
-		start := time.Now()
-
-		fmt.Println("Starting to search links...")
-
-		// Set a callback for when a visited HTML element is found
-		var wg = &sync.WaitGroup{}
-
-		for index, url := range urls {
-
-			wg.Add(1)
-			func(url string) {
-				defer wg.Done()
-
-				// Get the response body
-				body := getURL(url)
-				defer body.Close()
-
-				// Read the response body
-				data, err := io.ReadAll(body)
-				if err != nil {
-					fmt.Printf("client: error reading response body: %s\n", err)
-					os.Exit(1)
-				}
-
-				count := webScrapingCounter(string(data))
-
-				links = append(links, Link{
-					Id:    index,
-					Url:   url,
-					Links: count,
-				})
-				fmt.Printf("id: %d | url: %s | links: %d\n", index, url, count)
-				resp.Body.Links = links
-			}(url)
-		}
-		wg.Wait()
-
-		timeElapsed := time.Since(start)
-		resp.Body.Time = timeElapsed.String()
-
-		fmt.Printf("Finished searching links. Took %s\n", timeElapsed.String())
-		links = []Link{}
 
 		return resp, nil
 	})
